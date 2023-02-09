@@ -676,7 +676,7 @@ const { constants } = require("@openzeppelin/test-helpers")
                           updatedNumOfApprovals = transaction.numOfApprovals
 
                           assert.equal(
-                              initialTransactions[key].txId -
+                              initialTransactions[key].numOfApprovals -
                                   updatedNumOfApprovals,
                               1
                           )
