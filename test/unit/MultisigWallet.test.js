@@ -8,7 +8,7 @@ const { web3StringToBytes32 } = require("../../utils/web3StringToBytes")
 const { constants } = require("@openzeppelin/test-helpers")
 
 !developmentChains.includes(network.name)
-    ? describe.skip()
+    ? describe.skip
     : describe("MultisigWallet", function() {
           let multisigWallet
           let deployer
