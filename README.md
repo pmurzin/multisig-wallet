@@ -8,6 +8,13 @@ It can:
 - Execute a transaction after the required number of signatures have been obtained.
 - Cancel a transaction before it has been executed.
 
+Populate your .env file with these variables:
+
+```shell
+ADDRESSES_MULTISIG=<address1>,<address2>,<address3>,...
+MIN_SIG_AMOUNT=<min_signatures_required_number>
+```
+
 Try running some of the following tasks:
 
 Local network

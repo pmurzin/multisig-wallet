@@ -1,14 +1,19 @@
 const { network } = require("hardhat")
 
-const { networkConfig, developmentChains } = require("../helper-hardhat-config")
+const { developmentChains } = require("../helper-hardhat-config")
 
 const { verify } = require("../utils/verify")
+
+require("dotenv").config()
+
+const MIN_SIG_AMOUNT = process.env.MIN_SIG_AMOUNT
+const ADDRESSES_MULTISIG = process.env.ADDRESSES_MULTISIG
 
 module.exports = async ({ getNamedAccounts, deployments }) => {
     const { deploy, log } = deployments
     const { deployer } = await getNamedAccounts()
 
-    const minSigAmount = 2
+    const minSigAmount = MIN_SIG_AMOUNT
 
     let initialAddressSet = []
 
@@ -18,11 +23,7 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
             initialAddressSet.push(accounts[i].address)
         }
     } else {
-        initialAddressSet = [
-            "0x36AbaF94Dd60A2DC89B9b16506695026eDE428fd",
-            "0x3444f1d6457f1c39CB1c0f7C4783a4D6A1046d69",
-            "0x6e057Aab036b43489AD4882f6D701CF83772fF7b"
-        ]
+        initialAddressSet = ADDRESSES_MULTISIG.split(",")
     }
 
     console.log(initialAddressSet)
@@ -35,14 +36,16 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
         waitConfirmations: network.config.blockConfirmations || 1
     })
 
-    // if (
-    //     !developmentChains.includes(network.name) &&
-    //     process.env.ETHERSCAN_API_KEY
-    // ) {
-    //     await verify(MultisigWallet.address, args)
-    // }
+    if (
+        !developmentChains.includes(network.name) &&
+        process.env.ETHERSCAN_API_KEY
+    ) {
+        await verify(multisigWallet.address, args)
+    }
 
-    log("--------------------------------------------------------------------")
+    log(
+        "----------------------------------------------------------------------"
+    )
 }
 
 module.exports.tags = ["all", "multisigwallet"]
