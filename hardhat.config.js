@@ -14,6 +14,9 @@ const COINMARKETCAP_API_KEY = process.env.COINMARKETCAP_API_KEY
 const GOERLI_RPC_URL = process.env.GOERLI_RPC_URL
 const PRIVATE_KEY = process.env.PRIVATE_KEY
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY
+const PRIVATE_KEY_1 = process.env.PRIVATE_KEY_1
+const PRIVATE_KEY_2 = process.env.PRIVATE_KEY_2
+const PRIVATE_KEY_3 = process.env.PRIVATE_KEY_3
 
 module.exports = {
     defaultNetwork: "hardhat",
@@ -24,9 +27,10 @@ module.exports = {
         },
         goerli: {
             url: GOERLI_RPC_URL,
-            accounts: [PRIVATE_KEY],
+            accounts: [PRIVATE_KEY_1, PRIVATE_KEY_2, PRIVATE_KEY_3],
             chainId: 5,
-            blockConfirmations: 6
+            blockConfirmations: 6,
+            allowUnlimitedContractSize: true
         }
     },
     solidity: {

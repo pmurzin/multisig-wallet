@@ -1,7 +1,11 @@
 const { assert, expect } = require("chai")
 const { deployments, ethers } = require("hardhat")
 
-const { developmentChains } = require("../../helper-hardhat-config")
+const {
+    developmentChains,
+    MIN_SIG_AMOUNT,
+    INITIAL_ACCOUNT_BALANCE
+} = require("../../helper-hardhat-config")
 
 const { web3StringToBytes32 } = require("../../utils/web3StringToBytes")
 
@@ -16,10 +20,10 @@ const { constants } = require("@openzeppelin/test-helpers")
           let initialAddressSet = []
           let accounts
 
+          let initialContractBalance
+
           const sendValue = ethers.utils.parseEther("0.01")
           const bytesTxData = web3StringToBytes32("")
-          //        "11111111111111111111111111111111"
-          //  )
 
           const txAddressToSend = "0x0e5Ba7643b84B12fa643F3169A3D221B3eC96491"
 
@@ -31,12 +35,16 @@ const { constants } = require("@openzeppelin/test-helpers")
                   deployer
               )
 
-              minSigAmount = 2
+              minSigAmount = MIN_SIG_AMOUNT
 
               accounts = await ethers.getSigners()
               for (let i = 0; i < 3; i++) {
                   initialAddressSet.push(accounts[i].address)
               }
+
+              initialContractBalance = ethers.utils.parseEther(
+                  INITIAL_ACCOUNT_BALANCE.toString()
+              )
           })
 
           describe("Constructor", function() {
@@ -47,6 +55,15 @@ const { constants } = require("@openzeppelin/test-helpers")
                   assert.equal(
                       initialAddressSet.toString(),
                       initialSignatories.toString()
+                  )
+
+                  const getContractBalance = await multisigWallet.provider.getBalance(
+                      multisigWallet.address
+                  )
+
+                  assert.equal(
+                      getContractBalance.toString(),
+                      initialContractBalance.toString()
                   )
               })
           })
@@ -70,7 +87,7 @@ const { constants } = require("@openzeppelin/test-helpers")
               })
 
               it("Should update transactions array when submit tx", async function() {
-                  const transactionResponse = await multisigWallet.submitTx(
+                  await multisigWallet.submitTx(
                       txAddressToSend,
                       sendValue,
                       bytesTxData
@@ -124,6 +141,7 @@ const { constants } = require("@openzeppelin/test-helpers")
                   const secondSignatorySigner = multisigWallet.provider.getSigner(
                       initialAddressSet[1]
                   )
+
                   const secondSignatoryConnectedContract = await multisigWallet.connect(
                       secondSignatorySigner
                   )
@@ -137,21 +155,21 @@ const { constants } = require("@openzeppelin/test-helpers")
           })
 
           describe("executeTx", async function() {
-              beforeEach(async function() {
+              it("Should fail if not sufficient funding", async function() {
+                  const contractBalance = await multisigWallet.provider.getBalance(
+                      multisigWallet.address
+                  )
+
+                  // send twice as much than current contract balance
                   await multisigWallet.submitTx(
                       txAddressToSend,
-                      sendValue,
+                      contractBalance.mul(2),
                       bytesTxData
                   )
 
+                  // sign tx twice
                   await multisigWallet.signTx(0)
-              })
 
-              it("Should fail if not enough signatures", async function() {
-                  await expect(multisigWallet.executeTx(0)).to.be.reverted
-              })
-
-              it("Should success if there are enough signatures", async function() {
                   const secondSignatorySigner = multisigWallet.provider.getSigner(
                       initialAddressSet[1]
                   )
@@ -161,46 +179,128 @@ const { constants } = require("@openzeppelin/test-helpers")
 
                   await secondSignatoryConnectedContract.signTx(0)
 
-                  await expect(multisigWallet.executeTx(0)).not.to.be.reverted
-
-                  const executedTx = await multisigWallet.getTransaction(0)
-
-                  assert(executedTx.executed)
-              })
-
-              it("Should revert if tx already executed", async function() {
-                  const secondSignatorySigner = multisigWallet.provider.getSigner(
-                      initialAddressSet[1]
-                  )
-                  const secondSignatoryConnectedContract = await multisigWallet.connect(
-                      secondSignatorySigner
-                  )
-
-                  await secondSignatoryConnectedContract.signTx(0)
-
-                  await multisigWallet.executeTx(0)
                   await expect(multisigWallet.executeTx(0)).to.be.revertedWith(
-                      "MultisigWallet__TxAlreadyExecuted"
+                      "MultisigWallet__NotEnoughFunded"
                   )
               })
 
-              it("Only signatory allows to execute tx", async function() {
-                  const accounts = await ethers.getSigners()
-                  const attacker = accounts[6]
+              describe("Other cases with sufficient funding", async function() {
+                  beforeEach(async function() {
+                      await multisigWallet.submitTx(
+                          txAddressToSend,
+                          sendValue,
+                          bytesTxData
+                      )
 
-                  const attackerConnectedContract = await multisigWallet.connect(
-                      attacker
-                  )
+                      await multisigWallet.signTx(0)
+                  })
 
-                  await expect(
-                      attackerConnectedContract.executeTx(0)
-                  ).to.be.revertedWith("MultisigWallet__NotValidSignatory")
-              })
+                  it("Should fail if not enough signatures", async function() {
+                      await expect(multisigWallet.executeTx(0)).to.be.reverted
+                  })
 
-              it("Only allows to execute existing tx", async function() {
-                  await expect(multisigWallet.executeTx(1)).to.be.revertedWith(
-                      "MultisigWallet__NotValidTxId"
-                  )
+                  it("Should success if there are enough signatures", async function() {
+                      // add second signer
+                      const secondSignatorySigner = multisigWallet.provider.getSigner(
+                          initialAddressSet[1]
+                      )
+                      const secondSignatoryConnectedContract = await multisigWallet.connect(
+                          secondSignatorySigner
+                      )
+
+                      await secondSignatoryConnectedContract.signTx(0)
+
+                      const startingMultisigWalletBalance = await multisigWallet.provider.getBalance(
+                          multisigWallet.address
+                      )
+
+                      const startingAddressToSendBalance = await multisigWallet.provider.getBalance(
+                          txAddressToSend
+                      )
+
+                      const startingExecutionAccountBalance = await multisigWallet.provider.getBalance(
+                          deployer
+                      )
+
+                      // execute tx
+                      const executeTxResponse = await multisigWallet.executeTx(
+                          0
+                      )
+                      const transactionReceipt = await executeTxResponse.wait(1)
+
+                      const executedTx = await multisigWallet.getTransaction(0)
+
+                      // check updated status of transaction
+
+                      assert(executedTx.executed)
+
+                      // check updated balances for contract and recipient addresses
+                      const { gasUsed, effectiveGasPrice } = transactionReceipt
+
+                      const gasCost = gasUsed.mul(effectiveGasPrice)
+
+                      const endingMultisigWalletBalance = await multisigWallet.provider.getBalance(
+                          multisigWallet.address
+                      )
+
+                      const endingAddressToSendBalance = await multisigWallet.provider.getBalance(
+                          txAddressToSend
+                      )
+
+                      const endingExecutionAccountBalance = await multisigWallet.provider.getBalance(
+                          deployer
+                      )
+
+                      assert.equal(
+                          endingMultisigWalletBalance.add(sendValue).toString(),
+                          startingMultisigWalletBalance.toString()
+                      )
+
+                      assert.equal(
+                          endingAddressToSendBalance.toString(),
+                          startingAddressToSendBalance.add(sendValue).toString()
+                      )
+
+                      assert.equal(
+                          startingExecutionAccountBalance.toString(),
+                          endingExecutionAccountBalance.add(gasCost).toString()
+                      )
+                  })
+
+                  it("Should revert if tx already executed", async function() {
+                      const secondSignatorySigner = multisigWallet.provider.getSigner(
+                          initialAddressSet[1]
+                      )
+                      const secondSignatoryConnectedContract = await multisigWallet.connect(
+                          secondSignatorySigner
+                      )
+
+                      await secondSignatoryConnectedContract.signTx(0)
+
+                      await multisigWallet.executeTx(0)
+                      await expect(
+                          multisigWallet.executeTx(0)
+                      ).to.be.revertedWith("MultisigWallet__TxAlreadyExecuted")
+                  })
+
+                  it("Only signatory allows to execute tx", async function() {
+                      const accounts = await ethers.getSigners()
+                      const attacker = accounts[6]
+
+                      const attackerConnectedContract = await multisigWallet.connect(
+                          attacker
+                      )
+
+                      await expect(
+                          attackerConnectedContract.executeTx(0)
+                      ).to.be.revertedWith("MultisigWallet__NotValidSignatory")
+                  })
+
+                  it("Only allows to execute existing tx", async function() {
+                      await expect(
+                          multisigWallet.executeTx(1)
+                      ).to.be.revertedWith("MultisigWallet__NotValidTxId")
+                  })
               })
           })
 
@@ -682,6 +782,35 @@ const { constants } = require("@openzeppelin/test-helpers")
                           )
                       }
                   })
+              })
+          })
+
+          describe("fund", async function() {
+              it("Fails if you don't send enough ETH", async function() {
+                  await expect(multisigWallet.fund()).to.be.revertedWith(
+                      "You should send more ETH!"
+                  )
+              })
+
+              it("Updates the contract balance", async function() {
+                  const startingContractBalance = await multisigWallet.provider.getBalance(
+                      multisigWallet.address
+                  )
+
+                  const amountToFund = ethers.utils.parseEther("0.1")
+
+                  await multisigWallet.fund({
+                      value: amountToFund
+                  })
+
+                  const endingContractBalance = await multisigWallet.provider.getBalance(
+                      multisigWallet.address
+                  )
+
+                  assert.equal(
+                      startingContractBalance.add(amountToFund).toString(),
+                      endingContractBalance.toString()
+                  )
               })
           })
       })

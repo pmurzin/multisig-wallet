@@ -1,13 +1,14 @@
 const { network } = require("hardhat")
+const { assert } = require("chai")
 
-const { developmentChains } = require("../helper-hardhat-config")
+const {
+    developmentChains,
+    MIN_SIG_AMOUNT,
+    ADDRESSES_MULTISIG,
+    INITIAL_ACCOUNT_BALANCE
+} = require("../helper-hardhat-config")
 
 const { verify } = require("../utils/verify")
-
-require("dotenv").config()
-
-const MIN_SIG_AMOUNT = process.env.MIN_SIG_AMOUNT
-const ADDRESSES_MULTISIG = process.env.ADDRESSES_MULTISIG
 
 module.exports = async ({ getNamedAccounts, deployments }) => {
     const { deploy, log } = deployments
@@ -16,6 +17,16 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
     const minSigAmount = MIN_SIG_AMOUNT
 
     let initialAddressSet = []
+
+    assert(
+        INITIAL_ACCOUNT_BALANCE >= 0.1,
+        "Please make INITIAL_ACCOUNT_BALANCE at least 0.1 (ETH), in your .env file: \
+        INITIAL_ACCOUNT_BALANCE=0.1"
+    )
+
+    let initialContractBalance = ethers.utils.parseEther(
+        INITIAL_ACCOUNT_BALANCE.toString()
+    )
 
     if (developmentChains.includes(network.name)) {
         const accounts = await ethers.getSigners()
@@ -33,6 +44,7 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
         from: deployer,
         args: args,
         log: true,
+        value: initialContractBalance,
         waitConfirmations: network.config.blockConfirmations || 1
     })
 
