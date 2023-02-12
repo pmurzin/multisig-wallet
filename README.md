@@ -11,6 +11,7 @@ It can:
 Populate your .env file with these variables:
 
 ```shell
+GOERLI_RPC_URL=<your_rpc_url>
 ADDRESSES_MULTISIG=<address1>,<address2>,<address3>,...
 MIN_SIG_AMOUNT=<min_signatures_required_number>
 INITIAL_ACCOUNT_BALANCE=0.1 # at least 0.1 ETH
